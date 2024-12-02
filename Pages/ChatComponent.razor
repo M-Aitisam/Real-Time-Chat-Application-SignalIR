@@ -1,0 +1,52 @@
+﻿@page "/chat"
+@using Microsoft.AspNetCore.SignalR.Client
+@using Real_Time_Chat_Application_SignalIR.Data
+@inject ChatService ChatService
+@inject NavigationManager Navigation
+
+<div>
+    <h3>Welcome to Real time Aitisam Chat</h3>
+    <div>
+        @foreach (var (user, message) in ChatService.Messages)
+        {
+            <p><strong>@user:</strong> @message</p>
+        }
+    </div>
+    <input @bind="_user" placeholder="Enter your name" />
+    <input @bind="_message" placeholder="Enter a message" />
+    <button @onclick="SendMessageAsync">Send</button>
+</div>
+
+@code {
+    private HubConnection? _hubConnection;
+    private string _user = "";
+    private string _message = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Initialize SignalR connection
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/chathub"))
+            .Build();
+
+        _hubConnection.On<string, string>("ReceiveMessage", async (user, message) =>
+        {
+            ChatService.AddMessage(user, message);
+
+            // Ensure UI update happens on the main thread
+            await InvokeAsync(StateHasChanged);
+        });
+
+        await _hubConnection.StartAsync();
+    }
+
+
+    private async Task SendMessageAsync()
+    {
+        if (!string.IsNullOrEmpty(_user) && !string.IsNullOrEmpty(_message))
+        {
+            await _hubConnection!.SendAsync("SendMessage", _user, _message);
+            _message = ""; // Clear the input field
+        }
+    }
+}
